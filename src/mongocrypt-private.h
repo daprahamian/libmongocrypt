@@ -76,6 +76,7 @@ struct _mongocrypt_t {
    _mongocrypt_cache_t cache_key;
    _mongocrypt_log_t log;
    mongocrypt_status_t *status;
+   _mongocrypt_crypto_t* crypto;
    /* A counter, protected by mutex, for generating unique context ids */
    uint32_t ctx_counter;
 };

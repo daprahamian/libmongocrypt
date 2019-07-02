@@ -49,6 +49,7 @@ cd $evergreen_root
 cd libmongocrypt
 mkdir cmake-build
 cd cmake-build
+# TODO: also compile and upload after configuring with -DDISABLE_NATIVE_CRYPTO=ON.
 $CMAKE -DCMAKE_BUILD_TYPE=Debug "${LIBMONGOCRYPT_EXTRA_CMAKE_FLAGS}" -DCMAKE_C_FLAGS="-fPIC ${LIBMONGOCRYPT_EXTRA_CFLAGS}" -DCMAKE_PREFIX_PATH="${INSTALL_PREFIX}/mongo-c-driver" "-DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX}/libmongocrypt" ../
 echo "Installing libmongocrypt"
 $CMAKE --build . --target install

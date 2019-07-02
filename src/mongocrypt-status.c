@@ -25,6 +25,25 @@ mongocrypt_status_new (void)
 }
 
 
+mongocrypt_status_t *
+mongocrypt_status_new_from_message (mongocrypt_status_type_t type,
+                                    uint32_t code,
+                                    const char *message,
+                                    int32_t message_len)
+{
+   mongocrypt_status_t *status = mongocrypt_status_new ();
+   if (message_len < 0) {
+      message_len = strlen (message);
+   }
+   if (MONGOCRYPT_STATUS_MSG_LEN < message_len - 1) {
+      message_len = MONGOCRYPT_STATUS_MSG_LEN;
+   }
+   bson_strncpy (status->message, message, message_len);
+   status->type = type;
+   status->code = code;
+   return status;
+}
+
 const char *
 mongocrypt_status_message (mongocrypt_status_t *status, uint32_t *len)
 {

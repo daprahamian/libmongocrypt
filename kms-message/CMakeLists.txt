@@ -38,7 +38,11 @@ set (KMS_MESSAGE_SOURCES
    src/sort.c
    )
 
-if (WIN32)
+if (DISABLE_NATIVE_CRYPTO)
+   set (KMS_MESSAGE_SOURCES ${KMS_MESSAGE_SOURCES}
+      src/kms_crypto_none.c
+   )
+elseif (WIN32)
    set (KMS_MESSAGE_SOURCES ${KMS_MESSAGE_SOURCES}
       src/kms_crypto_windows.c
    )

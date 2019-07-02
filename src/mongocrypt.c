@@ -17,6 +17,7 @@
 #include <kms_message/kms_message.h>
 #include <bson/bson.h>
 
+#include "mongocrypt-private.h"
 #include "mongocrypt-binary-private.h"
 #include "mongocrypt-cache-collinfo-private.h"
 #include "mongocrypt-cache-key-private.h"
@@ -330,6 +331,12 @@ mongocrypt_init (mongocrypt_t *crypt)
       _mongocrypt_log_set_fn (
          &crypt->log, crypt->opts.log_fn, crypt->opts.log_ctx);
    }
+
+   if (!crypt->crypto) {
+      /* set default hooks. */
+      crypt->crypto = bson_malloc0 (sizeof (*crypt->crypto));
+      _crypto_set_default_hooks (crypt->crypto);
+   }
    return true;
 }
 
@@ -358,6 +365,7 @@ mongocrypt_destroy (mongocrypt_t *crypt)
    _mongocrypt_mutex_cleanup (&crypt->mutex);
    _mongocrypt_log_cleanup (&crypt->log);
    mongocrypt_status_destroy (crypt->status);
+   bson_free (crypt->crypto);
    bson_free (crypt);
 }
 
@@ -383,5 +391,148 @@ _mongocrypt_validate_and_copy_string (const char *in,
       return false;
    }
    *out = bson_strndup (in, in_len);
+   return true;
+}
+
+
+bool
+mongocrypt_setopt_crypto_hooks (
+   mongocrypt_t *crypt,
+   void *(*encrypt_aes_256_cbc_new) (mongocrypt_binary_t *key,
+                                     mongocrypt_binary_t *iv, mongocrypt_status_t *status),
+   bool (*encrypt_update) (void *ctx,
+                           mongocrypt_binary_t *in,
+                           mongocrypt_binary_t *out,
+                           uint32_t *bytes_written, mongocrypt_status_t *status),
+   bool (*encrypt_finalize) (void *ctx,
+                             mongocrypt_binary_t *out,
+                             uint32_t *bytes_written, mongocrypt_status_t *status),
+   void (*encrypt_destroy) (void *ctx),
+   void *(*decrypt_aes_256_cbc_new) (mongocrypt_binary_t *key,
+                                     mongocrypt_binary_t *iv, mongocrypt_status_t *status),
+   bool (*decrypt_update) (void *ctx,
+                           mongocrypt_binary_t *in,
+                           mongocrypt_binary_t *out,
+                           uint32_t *bytes_written, mongocrypt_status_t *status),
+   bool (*decrypt_finalize) (void *ctx,
+                             mongocrypt_binary_t *out,
+                             uint32_t *bytes_written, mongocrypt_status_t *status),
+   void (*decrypt_destroy) (void *ctx),
+   void *(*hmac_sha_512_new) (mongocrypt_binary_t *key, mongocrypt_status_t *status),
+   void *(*hmac_sha_256_new) (mongocrypt_binary_t *key, mongocrypt_status_t *status),
+   bool (*hmac_update) (void *ctx, mongocrypt_binary_t *in, mongocrypt_status_t *status),
+   bool (*hmac_finalize) (void *ctx, mongocrypt_binary_t *out, mongocrypt_status_t *status),
+   void (*hmac_destroy) (void *ctx),
+   void *(*hash_sha_256_new) (mongocrypt_status_t *status),
+   bool (*hash_update) (void *ctx, mongocrypt_binary_t *in, mongocrypt_status_t *status),
+   bool (*hash_finalize) (void *ctx, mongocrypt_binary_t *out, mongocrypt_status_t *status),
+   void (*hash_destroy) (void *ctx),
+   bool (*random) (mongocrypt_binary_t *out, uint32_t count, mongocrypt_status_t *status))
+{
+   mongocrypt_status_t *status = crypt->status;
+
+   if (crypt->initialized) {
+      CLIENT_ERR ("options cannot be set after initialization");
+      return false;
+   }
+
+   if (crypt->crypto) {
+      CLIENT_ERR ("crypto_hooks already set");
+      return false;
+   }
+
+   crypt->crypto = bson_malloc0 (sizeof (*crypt->crypto));
+
+   if (!encrypt_aes_256_cbc_new) {
+      CLIENT_ERR ("encrypt_aes_256_cbc_new not set");
+      return false;
+   }
+   crypt->crypto->encrypt_aes_256_cbc_new = encrypt_aes_256_cbc_new;
+
+   if (!encrypt_update) {
+      CLIENT_ERR ("encrypt_update not set");
+      return false;
+   }
+   crypt->crypto->encrypt_update = encrypt_update;
+   if (!encrypt_finalize) {
+      CLIENT_ERR ("encrypt_finalize not set");
+      return false;
+   }
+   crypt->crypto->encrypt_finalize = encrypt_finalize;
+   if (!encrypt_destroy) {
+      CLIENT_ERR ("encrypt_destroy not set");
+      return false;
+   }
+   crypt->crypto->encrypt_destroy = encrypt_destroy;
+   if (!decrypt_aes_256_cbc_new) {
+      CLIENT_ERR ("decrypt_aes_256_cbc_new not set");
+      return false;
+   }
+   crypt->crypto->decrypt_aes_256_cbc_new = decrypt_aes_256_cbc_new;
+   if (!decrypt_update) {
+      CLIENT_ERR ("decrypt_update not set");
+      return false;
+   }
+   crypt->crypto->decrypt_update = decrypt_update;
+   if (!decrypt_finalize) {
+      CLIENT_ERR ("decrypt_finalize not set");
+      return false;
+   }
+   crypt->crypto->decrypt_finalize = decrypt_finalize;
+   if (!decrypt_destroy) {
+      CLIENT_ERR ("decrypt_destroy not set");
+      return false;
+   }
+   crypt->crypto->decrypt_destroy = decrypt_destroy;
+   if (!hmac_sha_512_new) {
+      CLIENT_ERR ("hmac_sha_512_new not set");
+      return false;
+   }
+   crypt->crypto->hmac_sha_512_new = hmac_sha_512_new;
+   if (!hmac_sha_256_new) {
+      CLIENT_ERR ("hmac_sha_256_new not set");
+      return false;
+   }
+   crypt->crypto->hmac_sha_256_new = hmac_sha_256_new;
+   if (!hmac_update) {
+      CLIENT_ERR ("hmac_update not set");
+      return false;
+   }
+   crypt->crypto->hmac_update = hmac_update;
+   if (!hmac_finalize) {
+      CLIENT_ERR ("hmac_finalize not set");
+      return false;
+   }
+   crypt->crypto->hmac_finalize = hmac_finalize;
+   if (!hmac_destroy) {
+      CLIENT_ERR ("hmac_destroy not set");
+      return false;
+   }
+   crypt->crypto->hmac_destroy = hmac_destroy;
+   if (!hash_sha_256_new) {
+      CLIENT_ERR ("hash_sha_256_new not set");
+      return false;
+   }
+   crypt->crypto->hash_sha_256_new = hash_sha_256_new;
+   if (!hash_update) {
+      CLIENT_ERR ("hash_update not set");
+      return false;
+   }
+   crypt->crypto->hash_update = hash_update;
+   if (!hash_finalize) {
+      CLIENT_ERR ("hash_finalize not set");
+      return false;
+   }
+   crypt->crypto->hash_finalize = hash_finalize;
+   if (!hash_destroy) {
+      CLIENT_ERR ("hash_destroy not set");
+      return false;
+   }
+   crypt->crypto->hash_destroy = hash_destroy;
+   if (!random) {
+      CLIENT_ERR ("random not set");
+      return false;
+   }
+   crypt->crypto->random = random;
    return true;
 }

@@ -14,36 +14,40 @@
  * limitations under the License.
  */
 
-#ifndef KMS_MESSAGE_KMS_CRYPTO_H
-#define KMS_MESSAGE_KMS_CRYPTO_H
+#include "kms_crypto.h"
 
-#include <stdbool.h>
-#include <stdlib.h>
-
-typedef struct {
-    bool (*sha256) (void* ctx, const char *input, size_t len, unsigned char *hash_out);
-    bool (*sha256_hmac) (void* ctx, const char *key_input,
-                    size_t key_len,
-                    const char *input,
-                    size_t len,
-                    unsigned char *hash_out);
-    void *ctx;
-} _kms_crypto_t;
+#include <CommonCrypto/CommonDigest.h>
+#include <CommonCrypto/CommonHMAC.h>
 
 int
-kms_crypto_init ();
+kms_crypto_init ()
+{
+   return 0;
+}
 
 void
-kms_crypto_cleanup ();
+kms_crypto_cleanup ()
+{
+}
 
 bool
-kms_sha256 (void* ctx, const char *input, size_t len, unsigned char *hash_out);
+kms_sha256 (void *unused_ctx,
+            const char *input,
+            size_t len,
+            unsigned char *hash_out)
+{
+   /* only gets called if hooks were mistakenly not set */
+   return false;
+}
 
 bool
-kms_sha256_hmac (void* ctx, const char *key_input,
+kms_sha256_hmac (void *unused_ctx,
+                 const char *key_input,
                  size_t key_len,
                  const char *input,
                  size_t len,
-                 unsigned char *hash_out);
-
-#endif /* KMS_MESSAGE_KMS_CRYPTO_H */
+                 unsigned char *hash_out)
+{
+   /* only gets called if hooks were mistakenly not set */
+   return false;
+}

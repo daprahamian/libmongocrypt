@@ -96,6 +96,11 @@ elseif (WIN32)
    set (MONGOCRYPT_CRYPTO CNG)
 endif ()
 
+# Otherwise, override with crypto hooks.
+if (DISABLE_NATIVE_CRYPTO)
+   set (MONGOCRYPT_CRYPTO none)
+endif ()
+
 
 if (MONGOCRYPT_CRYPTO STREQUAL CommonCrypto)
    message ("Building with common crypto")
@@ -107,13 +112,20 @@ elseif (MONGOCRYPT_CRYPTO STREQUAL CNG)
    list(APPEND MONGOCRYPT_SOURCES
       src/crypto/cng.c
    )
-else ()
+elseif (MONGOCRYPT_CRYPTO STREQUAL OpenSSL)
    message ("Building with OpenSSL")
    include (FindOpenSSL)
    message ("Found OpenSSL version ${OPENSSL_VERSION}")
    list(APPEND MONGOCRYPT_SOURCES
       src/crypto/openssl.c
    )
+elseif (MONGOCRYPT_CRYPTO STREQUAL none)
+   message ("Building with no native crypto, hooks MUST be supplied with mongocrypt_setopt_crypto_hooks")
+   list(APPEND MONGOCRYPT_SOURCES
+      src/crypto/none.c
+   )
+else ()
+   message (FATAL "Unknown crypto provider ${MONGOCRYPT_CRYPTO}")
 endif ()
 
 # kms-message
@@ -145,7 +157,7 @@ if (MONGOCRYPT_CRYPTO STREQUAL CommonCrypto)
 elseif (MONGOCRYPT_CRYPTO STREQUAL CNG)
    target_link_libraries (mongocrypt PRIVATE "bcrypt")
    target_link_libraries (mongocrypt_static PRIVATE "bcrypt")
-else ()
+elseif (MONGOCRYPT_CRYPTO STREQUAL OpenSSL)
    target_link_libraries (mongocrypt PRIVATE OpenSSL::SSL OpenSSL::Crypto)
    target_link_libraries (mongocrypt_static PRIVATE OpenSSL::SSL OpenSSL::Crypto)
 endif ()
@@ -169,6 +181,7 @@ set (TEST_MONGOCRYPT_SOURCES
    test/test-mongocrypt-cache.c
    test/test-mongocrypt-ciphertext.c
    test/test-mongocrypt-crypto.c
+   test/test-mongocrypt-crypto-hooks.c
    test/test-mongocrypt-ctx-decrypt.c
    test/test-mongocrypt-ctx-encrypt.c
    test/test-mongocrypt-ctx-setopt.c

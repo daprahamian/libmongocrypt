@@ -63,7 +63,8 @@ _replace_ciphertext_with_plaintext (void *ctx,
       goto fail;
    }
 
-   if (!_mongocrypt_do_decryption (&associated_data,
+   if (!_mongocrypt_do_decryption (kb->crypt->crypto,
+                                   &associated_data,
                                    &key_material,
                                    &ciphertext.data,
                                    &plaintext,
