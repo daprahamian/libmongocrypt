@@ -21,7 +21,7 @@
 
 #include "../mongocrypt-crypto-private.h"
 #include "../mongocrypt-private.h"
-#include "../mongocrypt-binary-private.h"
+#include "../mongocrypt-log-private.h"
 
 #include <bson/bson.h>
 
@@ -70,10 +70,9 @@ _crypto_init ()
 
 
 void *
-_crypto_encrypt_aes_256_cbc_new (
-                                 mongocrypt_binary_t *key,
-                                 mongocrypt_binary_t *iv,
-                                 mongocrypt_status_t *status)
+_crypto_encrypt_new (const _mongocrypt_buffer_t *key,
+                     const _mongocrypt_buffer_t *iv,
+                     mongocrypt_status_t *status)
 {
    const EVP_CIPHER *cipher;
    EVP_CIPHER_CTX *ctx;
@@ -109,10 +108,9 @@ done:
 
 
 bool
-_crypto_encrypt_update (
-                        void *ctx,
-                        mongocrypt_binary_t *in,
-                        mongocrypt_binary_t *out,
+_crypto_encrypt_update (void *ctx,
+                        const _mongocrypt_buffer_t *in,
+                        _mongocrypt_buffer_t *out,
                         uint32_t *bytes_written,
                         mongocrypt_status_t *status)
 {
@@ -132,9 +130,8 @@ done:
 
 
 bool
-_crypto_encrypt_finalize (
-                          void *ctx,
-                          mongocrypt_binary_t *out,
+_crypto_encrypt_finalize (void *ctx,
+                          _mongocrypt_buffer_t *out,
                           uint32_t *bytes_written,
                           mongocrypt_status_t *status)
 {
@@ -153,7 +150,7 @@ done:
 
 
 void
-_crypto_encrypt_destroy ( void *ctx)
+_crypto_encrypt_destroy (void *ctx)
 {
    if (ctx) {
       EVP_CIPHER_CTX_free (ctx);
@@ -162,10 +159,9 @@ _crypto_encrypt_destroy ( void *ctx)
 
 
 void *
-_crypto_decrypt_aes_256_cbc_new (
-                             mongocrypt_binary_t *key,
-                             mongocrypt_binary_t *iv,
-                             mongocrypt_status_t *status)
+_crypto_decrypt_new (const _mongocrypt_buffer_t *key,
+                     const _mongocrypt_buffer_t *iv,
+                     mongocrypt_status_t *status)
 {
    const EVP_CIPHER *cipher;
    EVP_CIPHER_CTX *ctx;
@@ -199,10 +195,9 @@ done:
 
 
 bool
-_crypto_decrypt_update (
-                        void *ctx,
-                        mongocrypt_binary_t *in,
-                        mongocrypt_binary_t *out,
+_crypto_decrypt_update (void *ctx,
+                        const _mongocrypt_buffer_t *in,
+                        _mongocrypt_buffer_t *out,
                         uint32_t *bytes_written,
                         mongocrypt_status_t *status)
 {
@@ -222,9 +217,8 @@ done:
 
 
 bool
-_crypto_decrypt_finalize (
-                          void *ctx,
-                          mongocrypt_binary_t *out,
+_crypto_decrypt_finalize (void *ctx,
+                          _mongocrypt_buffer_t *out,
                           uint32_t *bytes_written,
                           mongocrypt_status_t *status)
 {
@@ -243,16 +237,14 @@ done:
 
 
 void
-_crypto_decrypt_destroy ( void *ctx)
+_crypto_decrypt_destroy (void *ctx)
 {
    EVP_CIPHER_CTX_free (ctx);
 }
 
 
 void *
-_crypto_hmac_sha_512_new (
-                          mongocrypt_binary_t *key,
-                          mongocrypt_status_t *status)
+_crypto_hmac_new (const _mongocrypt_buffer_t *key, mongocrypt_status_t *status)
 {
    const EVP_MD *algo;
    HMAC_CTX *ctx;
@@ -280,9 +272,8 @@ done:
 
 
 bool
-_crypto_hmac_update (
-                     void *ctx,
-                     mongocrypt_binary_t *in,
+_crypto_hmac_update (void *ctx,
+                     const _mongocrypt_buffer_t *in,
                      mongocrypt_status_t *status)
 {
    bool ret = false;
@@ -300,9 +291,9 @@ done:
 
 
 bool
-_crypto_hmac_finalize (
-                       void *ctx,
-                       mongocrypt_binary_t *out,
+_crypto_hmac_finalize (void *ctx,
+                       _mongocrypt_buffer_t *out,
+                       uint32_t *bytes_written,
                        mongocrypt_status_t *status)
 {
    bool ret = false;
@@ -320,7 +311,7 @@ done:
 
 
 void
-_crypto_hmac_destroy ( void *ctx)
+_crypto_hmac_destroy (void *ctx)
 {
    if (ctx) {
       HMAC_CTX_free (ctx);
@@ -329,11 +320,9 @@ _crypto_hmac_destroy ( void *ctx)
 
 
 bool
-_crypto_random (
-                mongocrypt_binary_t *out,
-                uint32_t count,
+_crypto_random (_mongocrypt_buffer_t *out,
                 mongocrypt_status_t *status,
-                )
+                uint32_t count)
 {
    int ret = RAND_bytes (out->data, count);
    /* From man page: "RAND_bytes() and RAND_priv_bytes() return 1 on success, -1
@@ -349,27 +338,4 @@ _crypto_random (
       return false;
    }
    return true;
-}
-
-void
-_crypto_set_default_hooks (_mongocrypt_crypto_t *hooks)
-{
-   hooks->encrypt_aes_256_cbc_new = _crypto_encrypt_aes_256_cbc_new;
-   hooks->encrypt_update = _crypto_encrypt_update;
-   hooks->encrypt_finalize = _crypto_encrypt_finalize;
-   hooks->encrypt_destroy = _crypto_encrypt_destroy;
-   hooks->decrypt_aes_256_cbc_new = _crypto_decrypt_aes_256_cbc_new;
-   hooks->decrypt_update = _crypto_decrypt_update;
-   hooks->decrypt_finalize = _crypto_decrypt_finalize;
-   hooks->decrypt_destroy = _crypto_decrypt_destroy;
-   hooks->hmac_sha_512_new = _crypto_hmac_sha_512_new;
-   hooks->hmac_sha_256_new = NULL; /* implemented in KMS message. */
-   hooks->hmac_update = _crypto_hmac_update;
-   hooks->hmac_finalize = _crypto_hmac_finalize;
-   hooks->hmac_destroy = _crypto_hmac_destroy;
-   hooks->hash_sha_256_new = NULL;
-   hooks->hash_update = NULL;
-   hooks->hash_finalize = NULL;
-   hooks->hash_destroy = NULL;
-   hooks->random = _crypto_random;
 }

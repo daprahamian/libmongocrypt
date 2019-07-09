@@ -16,7 +16,6 @@
 
 #include "../mongocrypt-crypto-private.h"
 #include "../mongocrypt-private.h"
-#include "../mongocrypt-binary-private.h"
 
 #include <bcrypt.h>
 
@@ -100,8 +99,8 @@ typedef struct {
 
 
 static cng_encrypt_state *
-_crypto_state_init (mongocrypt_binary_t *key,
-                    mongocrypt_binary_t *iv,
+_crypto_state_init (const _mongocrypt_buffer_t *key,
+                    const _mongocrypt_buffer_t *iv,
                     mongocrypt_status_t *status)
 {
    cng_encrypt_state *state;
@@ -176,9 +175,9 @@ _crypto_state_destroy (cng_encrypt_state *state)
 }
 
 void *
-_crypto_encrypt_aes_256_cbc_new (mongocrypt_binary_t *key,
-                                 mongocrypt_binary_t *iv,
-                                 mongocrypt_status_t *status)
+_crypto_encrypt_new (const _mongocrypt_buffer_t *key,
+                     const _mongocrypt_buffer_t *iv,
+                     mongocrypt_status_t *status)
 {
    return _crypto_state_init (key, iv, status);
 }
@@ -186,8 +185,8 @@ _crypto_encrypt_aes_256_cbc_new (mongocrypt_binary_t *key,
 
 bool
 _crypto_encrypt_update (void *ctx,
-                        mongocrypt_binary_t *in,
-                        mongocrypt_binary_t *out,
+                        const _mongocrypt_buffer_t *in,
+                        _mongocrypt_buffer_t *out,
                         uint32_t *bytes_written,
                         mongocrypt_status_t *status)
 {
@@ -217,7 +216,7 @@ _crypto_encrypt_update (void *ctx,
 
 bool
 _crypto_encrypt_finalize (void *ctx,
-                          mongocrypt_binary_t *out,
+                          _mongocrypt_buffer_t *out,
                           uint32_t *bytes_written,
                           mongocrypt_status_t *status)
 {
@@ -237,9 +236,9 @@ _crypto_encrypt_destroy (void *ctx)
 
 
 void *
-_crypto_decrypt_aes_256_cbc_new (mongocrypt_binary_t *key,
-                                 mongocrypt_binary_t *iv,
-                                 mongocrypt_status_t *status)
+_crypto_decrypt_new (const _mongocrypt_buffer_t *key,
+                     const _mongocrypt_buffer_t *iv,
+                     mongocrypt_status_t *status)
 {
    return _crypto_state_init (key, iv, status);
 }
@@ -247,8 +246,8 @@ _crypto_decrypt_aes_256_cbc_new (mongocrypt_binary_t *key,
 
 bool
 _crypto_decrypt_update (void *ctx,
-                        mongocrypt_binary_t *in,
-                        mongocrypt_binary_t *out,
+                        const _mongocrypt_buffer_t *in,
+                        _mongocrypt_buffer_t *out,
                         uint32_t *bytes_written,
                         mongocrypt_status_t *status)
 {
@@ -279,7 +278,7 @@ _crypto_decrypt_update (void *ctx,
 
 bool
 _crypto_decrypt_finalize (void *ctx,
-                          mongocrypt_binary_t *out,
+                          _mongocrypt_buffer_t *out,
                           uint32_t *bytes_written,
                           mongocrypt_status_t *status)
 {
@@ -298,7 +297,7 @@ _crypto_decrypt_destroy (void *ctx)
 }
 
 void *
-_crypto_hmac_sha_512_new (mongocrypt_binary_t *key, mongocrypt_status_t *status)
+_crypto_hmac_new (const _mongocrypt_buffer_t *key, mongocrypt_status_t *status)
 {
    BCRYPT_HASH_HANDLE hHash;
    NTSTATUS nt_status;
@@ -321,7 +320,7 @@ _crypto_hmac_sha_512_new (mongocrypt_binary_t *key, mongocrypt_status_t *status)
 
 bool
 _crypto_hmac_update (void *ctx,
-                     mongocrypt_binary_t *in,
+                     const _mongocrypt_buffer_t *in,
                      mongocrypt_status_t *status)
 {
    BCRYPT_HASH_HANDLE hHash;
@@ -341,7 +340,8 @@ _crypto_hmac_update (void *ctx,
 
 bool
 _crypto_hmac_finalize (void *ctx,
-                       mongocrypt_binary_t *out,
+                       _mongocrypt_buffer_t *out,
+                       uint32_t *bytes_written,
                        mongocrypt_status_t *status)
 {
    BCRYPT_HASH_HANDLE hHash;
@@ -372,9 +372,9 @@ _crypto_hmac_destroy (void *ctx)
 
 
 bool
-_crypto_random (mongocrypt_binary_t *out,
-                uint32_t count,
-                mongocrypt_status_t *status)
+_crypto_random (_mongocrypt_buffer_t *out,
+                mongocrypt_status_t *status,
+                uint32_t count)
 {
    NTSTATUS nt_status = BCryptGenRandom (_random, out->data, count, 0);
    if (nt_status != STATUS_SUCCESS) {
@@ -383,28 +383,4 @@ _crypto_random (mongocrypt_binary_t *out,
    }
 
    return true;
-}
-
-
-void
-_crypto_set_default_hooks (_mongocrypt_crypto_t *hooks)
-{
-   hooks->encrypt_aes_256_cbc_new = _crypto_encrypt_aes_256_cbc_new;
-   hooks->encrypt_update = _crypto_encrypt_update;
-   hooks->encrypt_finalize = _crypto_encrypt_finalize;
-   hooks->encrypt_destroy = _crypto_encrypt_destroy;
-   hooks->decrypt_aes_256_cbc_new = _crypto_decrypt_aes_256_cbc_new;
-   hooks->decrypt_update = _crypto_decrypt_update;
-   hooks->decrypt_finalize = _crypto_decrypt_finalize;
-   hooks->decrypt_destroy = _crypto_decrypt_destroy;
-   hooks->hmac_sha_512_new = _crypto_hmac_sha_512_new;
-   hooks->hmac_sha_256_new = NULL; /* implemented in KMS message. */
-   hooks->hmac_update = _crypto_hmac_update;
-   hooks->hmac_finalize = _crypto_hmac_finalize;
-   hooks->hmac_destroy = _crypto_hmac_destroy;
-   hooks->hash_sha_256_new = NULL;
-   hooks->hash_update = NULL;
-   hooks->hash_finalize = NULL;
-   hooks->hash_destroy = NULL;
-   hooks->random = _crypto_random;
 }
