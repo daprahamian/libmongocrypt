@@ -418,6 +418,7 @@ mongocrypt_setopt_crypto_hooks (mongocrypt_t *crypt,
    }
 
    crypt->crypto = bson_malloc0 (sizeof (*crypt->crypto));
+   crypt->crypto->hooks_enabled = true;
    crypt->crypto->ctx = ctx;
 
    if (!aes_256_cbc_encrypt) {

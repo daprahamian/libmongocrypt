@@ -21,6 +21,7 @@
 
 #include <bson/bson.h>
 
+#include "mongocrypt-binary-private.h"
 #include "mongocrypt-buffer-private.h"
 #include "mongocrypt-crypto-private.h"
 #include "mongocrypt-log-private.h"
@@ -54,7 +55,24 @@ _crypto_aes_256_cbc_encrypt (_mongocrypt_crypto_t *crypto,
       return false;
    }
 
-   /* TODO: If there's a hook set, create a binary and call it. */
+   if (crypto->hooks_enabled) {
+      mongocrypt_binary_t enc_key_bin, iv_bin, out_bin;
+      mongocrypt_binary_t *in_array_bin;
+      uint32_t i;
+      bool ret;
+
+      _mongocrypt_buffer_to_binary (enc_key, &enc_key_bin);
+      _mongocrypt_buffer_to_binary (iv, &iv_bin);
+      _mongocrypt_buffer_to_binary (out, &out_bin);
+      in_array_bin = bson_malloc0 (sizeof(mongocrypt_binary_t) * in_count);
+      for (i = 0; i < in_count; i++) {
+         _mongocrypt_buffer_to_binary (&in_array[i], &in_array_bin[i]);
+      }
+
+      ret = crypto->aes_256_cbc_encrypt (crypto->ctx, &enc_key_bin, &iv_bin, in_array_bin, in_count, &out_bin, bytes_written, status);
+      bson_free (in_array_bin);
+      return ret;
+   }
    return _native_crypto_aes_256_cbc_encrypt (
       enc_key, iv, in_array, in_count, out, bytes_written, status);
 }
@@ -80,6 +98,24 @@ _crypto_aes_256_cbc_decrypt (_mongocrypt_crypto_t *crypto,
       return false;
    }
 
+   if (crypto->hooks_enabled) {
+      mongocrypt_binary_t enc_key_bin, iv_bin, out_bin;
+      mongocrypt_binary_t *in_array_bin;
+      uint32_t i;
+      bool ret;
+
+      _mongocrypt_buffer_to_binary (enc_key, &enc_key_bin);
+      _mongocrypt_buffer_to_binary (iv, &iv_bin);
+      _mongocrypt_buffer_to_binary (out, &out_bin);
+      in_array_bin = bson_malloc0 (sizeof(mongocrypt_binary_t) * in_count);
+      for (i = 0; i < in_count; i++) {
+         _mongocrypt_buffer_to_binary (&in_array[i], &in_array_bin[i]);
+      }
+
+      ret = crypto->aes_256_cbc_decrypt (crypto->ctx, &enc_key_bin, &iv_bin, in_array_bin, in_count, &out_bin, bytes_written, status);
+      bson_free (in_array_bin);
+      return ret;
+   }
    return _native_crypto_aes_256_cbc_decrypt (
       enc_key, iv, in_array, in_count, out, bytes_written, status);
 }
@@ -102,6 +138,24 @@ _crypto_hmac_sha_512 (_mongocrypt_crypto_t *crypto,
       CLIENT_ERR ("no input provided");
       return false;
    }
+
+   if (crypto->hooks_enabled) {
+      mongocrypt_binary_t hmac_key_bin, out_bin;
+      mongocrypt_binary_t *in_array_bin;
+      uint32_t i;
+      bool ret;
+
+      _mongocrypt_buffer_to_binary (hmac_key, &hmac_key_bin);
+      _mongocrypt_buffer_to_binary (out, &out_bin);
+      in_array_bin = bson_malloc0 (sizeof(mongocrypt_binary_t) * in_count);
+      for (i = 0; i < in_count; i++) {
+         _mongocrypt_buffer_to_binary (&in_array[i], &in_array_bin[i]);
+      }
+
+      ret = crypto->hmac_sha_512 (crypto->ctx, &hmac_key_bin, in_array_bin, in_count, &out_bin, status);
+      bson_free (in_array_bin);
+      return ret;
+   }
    return _native_crypto_hmac_sha_512 (
       hmac_key, in_array, in_count, out, status);
 }
@@ -113,6 +167,12 @@ _crypto_random (_mongocrypt_crypto_t *crypto,
                 uint32_t count,
                 mongocrypt_status_t *status)
 {
+   if (crypto->hooks_enabled) {
+      mongocrypt_binary_t out_bin;
+
+      _mongocrypt_buffer_to_binary (out, &out_bin);
+      return crypto->random (crypto->ctx, &out_bin, count, status);
+   }
    return _native_crypto_random (out, count, status);
 }
 

@@ -45,7 +45,6 @@
 /* a document containing the history of calls */
 static bson_string_t *call_history;
 
-
 static void
 _append_bin (const char *name, mongocrypt_binary_t *bin)
 {
@@ -270,6 +269,7 @@ _test_crypto_hooks_encryption (_mongocrypt_tester_t *tester)
    ciphertext.len = bytes_written;
 
    /* Check the full trace. */
+   printf("%s\n", call_history->str);
    BSON_ASSERT (0 == strcmp (call_history->str, expected_call_history));
 
    /* Check the structure of the ciphertext */
