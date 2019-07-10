@@ -21,23 +21,29 @@
 #include <CommonCrypto/CommonHMAC.h>
 #include <CommonCrypto/CommonRandom.h>
 
-bool _crypto_initialized = false;
+bool _native_crypto_initialized = false;
 
 void
-_crypto_init ()
+_native_crypto_init ()
 {
-   _crypto_initialized = true;
+   _native_crypto_initialized = true;
 }
 
 
-void *
-_crypto_encrypt_new (const _mongocrypt_buffer_t *key,
-                     const _mongocrypt_buffer_t *iv,
-                     mongocrypt_status_t *status)
+bool
+_native_crypto_aes_256_cbc_encrypt (const _mongocrypt_buffer_t *key,
+                                    const _mongocrypt_buffer_t *iv,
+                                    _mongocrypt_buffer_t *in_array,
+                                    uint32_t in_count,
+                                    _mongocrypt_buffer_t *out,
+                                    uint32_t *bytes_written,
+                                    mongocrypt_status_t *status)
 {
    bool ret = false;
    CCCryptorRef ctx = NULL;
    CCCryptorStatus cc_status;
+   size_t intermediate_bytes_written;
+   uint32_t i;
 
    cc_status = CCCryptorCreate (kCCEncrypt,
                                 kCCAlgorithmAES,
@@ -52,58 +58,24 @@ _crypto_encrypt_new (const _mongocrypt_buffer_t *key,
       goto done;
    }
 
-   ret = true;
-done:
-   if (!ret) {
-      return NULL;
-   }
-   return (void *) ctx;
-}
-
-
-bool
-_crypto_encrypt_update (void *ctx,
-                        const _mongocrypt_buffer_t *in,
-                        _mongocrypt_buffer_t *out,
-                        uint32_t *bytes_written,
-                        mongocrypt_status_t *status)
-{
-   bool ret = false;
-   CCCryptorStatus cc_status;
-   size_t bytes_written_size;
-
-   cc_status = CCCryptorUpdate (
-      ctx, in->data, in->len, out->data, out->len, &bytes_written_size);
-
-   *bytes_written = bytes_written_size;
-
-   if (cc_status != kCCSuccess) {
-      CLIENT_ERR ("error encrypting: %d", (int) cc_status);
-      goto done;
+   *bytes_written = 0;
+   for (i = 0; i < in_count; i++) {
+      cc_status = CCCryptorUpdate (ctx,
+                                   in->data,
+                                   in->len,
+                                   out->data,
+                                   out->len,
+                                   &intermediate_bytes_written);
+      if (cc_status != kCCSuccess) {
+         CLIENT_ERR ("error encrypting: %d", (int) cc_status);
+         goto done;
+      }
+      *bytes_written += intermediate_bytes_written;
    }
 
-   ret = true;
-done:
-   if (!ret) {
-      return NULL;
-   }
-   return ret;
-}
-
-
-bool
-_crypto_encrypt_finalize (void *ctx,
-                          _mongocrypt_buffer_t *out,
-                          uint32_t *bytes_written,
-                          mongocrypt_status_t *status)
-{
-   bool ret = false;
-   CCCryptorStatus cc_status;
-   size_t bytes_written_size;
-
-   cc_status = CCCryptorFinal (ctx, out->data, out->len, &bytes_written_size);
-
-   *bytes_written = bytes_written_size;
+   cc_status =
+      CCCryptorFinal (ctx, out->data, out->len, &intermediate_bytes_written);
+   *bytes_written = intermediate_bytes_written;
 
    if (cc_status != kCCSuccess) {
       CLIENT_ERR ("error finalizing: %d", (int) cc_status);
@@ -112,33 +84,29 @@ _crypto_encrypt_finalize (void *ctx,
 
    ret = true;
 done:
+   CCCryptorRelease (ctx);
    if (!ret) {
-      return NULL;
+      return false;
    }
-   return ret;
+   return true;
 }
 
 
-void
-_crypto_encrypt_destroy (void *ctx)
-{
-   if (ctx) {
-      CCCryptorRelease (ctx);
-   }
-}
-
-
-/* Note, the decrypt functions are almost exactly the same as the encrypt
- * functions
- * except for the kCCDecrypt and the error message. */
-void *
-_crypto_decrypt_new (const _mongocrypt_buffer_t *key,
-                     const _mongocrypt_buffer_t *iv,
-                     mongocrypt_status_t *status)
+/* Note, the decrypt function is almost exactly the same as the encrypt
+ * functions except for the kCCDecrypt and the error message. */
+bool
+_native_crypto_aes_256_cbc_decrypt (const _mongocrypt_buffer_t *key,
+                                    _mongocrypt_buffer_t *in_array,
+                                    uint32_t in_count,
+                                    _mongocrypt_buffer_t *out,
+                                    uint32_t *bytes_written,
+                                    mongocrypt_status_t *status)
 {
    bool ret = false;
    CCCryptorRef ctx = NULL;
    CCCryptorStatus cc_status;
+   size_t intermediate_bytes_written;
+   uint32_t i;
 
    cc_status = CCCryptorCreate (kCCDecrypt,
                                 kCCAlgorithmAES,
@@ -153,58 +121,24 @@ _crypto_decrypt_new (const _mongocrypt_buffer_t *key,
       goto done;
    }
 
-   ret = true;
-done:
-   if (!ret) {
-      return NULL;
-   }
-   return ctx;
-}
-
-
-bool
-_crypto_decrypt_update (void *ctx,
-                        const _mongocrypt_buffer_t *in,
-                        _mongocrypt_buffer_t *out,
-                        uint32_t *bytes_written,
-                        mongocrypt_status_t *status)
-{
-   bool ret = false;
-   CCCryptorStatus cc_status;
-   size_t bytes_written_size;
-
-   cc_status = CCCryptorUpdate (
-      ctx, in->data, in->len, out->data, out->len, &bytes_written_size);
-
-   *bytes_written = bytes_written_size;
-
-   if (cc_status != kCCSuccess) {
-      CLIENT_ERR ("error decrypting: %d", (int) cc_status);
-      goto done;
+   *bytes_written = 0;
+   for (i = 0; i < in_count; i++) {
+      cc_status = CCCryptorUpdate (ctx,
+                                   in->data,
+                                   in->len,
+                                   out->data,
+                                   out->len,
+                                   &intermediate_bytes_written);
+      if (cc_status != kCCSuccess) {
+         CLIENT_ERR ("error decrypting: %d", (int) cc_status);
+         goto done;
+      }
+      *bytes_written += intermediate_bytes_written;
    }
 
-   ret = true;
-done:
-   if (!ret) {
-      return NULL;
-   }
-   return ret;
-}
-
-
-bool
-_crypto_decrypt_finalize (void *ctx,
-                          _mongocrypt_buffer_t *out,
-                          uint32_t *bytes_written,
-                          mongocrypt_status_t *status)
-{
-   bool ret = false;
-   CCCryptorStatus cc_status;
-   size_t bytes_written_size;
-
-   cc_status = CCCryptorFinal (ctx, out->data, out->len, &bytes_written_size);
-
-   *bytes_written = bytes_written_size;
+   cc_status =
+      CCCryptorFinal (ctx, out->data, out->len, &intermediate_bytes_written);
+   *bytes_written = intermediate_bytes_written;
 
    if (cc_status != kCCSuccess) {
       CLIENT_ERR ("error finalizing: %d", (int) cc_status);
@@ -213,71 +147,48 @@ _crypto_decrypt_finalize (void *ctx,
 
    ret = true;
 done:
+   CCCryptorRelease (ctx);
    if (!ret) {
-      return NULL;
+      return false;
    }
-   return ret;
-}
-
-
-void
-_crypto_decrypt_destroy (void *ctx)
-{
-   if (ctx) {
-      CCCryptorRelease (ctx);
-   }
+   return true;
 }
 
 
 /* CCHmac functions don't return errors. */
-void *
-_crypto_hmac_new (const _mongocrypt_buffer_t *key, mongocrypt_status_t *status)
+bool
+_native_crypto_hmac_sha_512 (const _mongocrypt_buffer_t *key,
+                             _mongocrypt_buffer_t *in_array,
+                             uint32_t in_count,
+                             _mongocrypt_buffer_t *out,
+                             mongocrypt_status_t *status)
 {
+   uint32_t i;
    CCHmacContext *ctx;
+
+   if (out->len < 64) {
+      CLIENT_ERR ("out does not contain >= 64 bytes");
+      return false;
+   }
 
    ctx = bson_malloc0 (sizeof (*ctx));
 
    CCHmacInit (ctx, kCCHmacAlgSHA512, key->data, key->len);
-   return ctx;
-}
 
-
-bool
-_crypto_hmac_update (void *ctx,
-                     const _mongocrypt_buffer_t *in,
-                     mongocrypt_status_t *status)
-{
-   CCHmacUpdate (ctx, in->data, in->len);
-   return true;
-}
-
-
-bool
-_crypto_hmac_finalize (void *ctx,
-                       _mongocrypt_buffer_t *out,
-                       uint32_t *bytes_written,
-                       mongocrypt_status_t *status)
-{
-   BSON_ASSERT (out->len >= 64);
-   CCHmacFinal (ctx, out->data);
-   *bytes_written = 64; /* have faith! */
-   return true;
-}
-
-
-void
-_crypto_hmac_destroy (void *ctx)
-{
-   if (ctx) {
-      bson_free (ctx);
+   for (i = 0; i < in_count; i++) {
+      CCHmacUpdate (ctx, in_array[i]->data, in_array[i]->len);
    }
+
+   CCHmacFinal (ctx, out->data);
+   bson_free (ctx);
+   return true;
 }
 
 
 bool
-_crypto_random (_mongocrypt_buffer_t *out,
-                mongocrypt_status_t *status,
-                uint32_t count)
+_native_crypto_random (_mongocrypt_buffer_t *out,
+                       uint32_t count,
+                       mongocrypt_status_t *status)
 {
    CCRNGStatus ret = CCRandomGenerateBytes (out->data, (size_t) count);
    if (ret != kCCSuccess) {
