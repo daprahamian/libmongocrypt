@@ -17,7 +17,8 @@
 #ifndef MONGOCRYPT_CRYPTO_PRIVATE_H
 #define MONGOCRYPT_CRYPTO_PRIVATE_H
 
-#include "mongocrypt-private.h"
+#include "mongocrypt.h"
+#include "mongocrypt-buffer-private.h"
 
 #define MONGOCRYPT_KEY_LEN 96
 #define MONGOCRYPT_IV_KEY_LEN 32
@@ -60,8 +61,8 @@ _mongocrypt_do_decryption (_mongocrypt_crypto_t *crypto,
 bool
 _mongocrypt_random (_mongocrypt_crypto_t *crypto,
                     _mongocrypt_buffer_t *out,
-                    mongocrypt_status_t *status,
-                    uint32_t count);
+                    uint32_t count,
+                    mongocrypt_status_t *status);
 
 int
 _mongocrypt_memcmp (const void *const b1, const void *const b2, size_t len);
@@ -83,13 +84,13 @@ _mongocrypt_calculate_deterministic_iv (
 extern bool _native_crypto_initialized;
 
 void
-_native_crypto_native_init ();
+_native_crypto_init ();
 
 
 bool
 _native_crypto_aes_256_cbc_encrypt (const _mongocrypt_buffer_t *key,
                                     const _mongocrypt_buffer_t *iv,
-                                    _mongocrypt_buffer_t *in_array,
+                                    const _mongocrypt_buffer_t *in_array,
                                     uint32_t in_count,
                                     _mongocrypt_buffer_t *out,
                                     uint32_t *bytes_written,
@@ -97,7 +98,8 @@ _native_crypto_aes_256_cbc_encrypt (const _mongocrypt_buffer_t *key,
 
 bool
 _native_crypto_aes_256_cbc_decrypt (const _mongocrypt_buffer_t *key,
-                                    _mongocrypt_buffer_t *in_array,
+                                    const _mongocrypt_buffer_t *iv,
+                                    const _mongocrypt_buffer_t *in_array,
                                     uint32_t in_count,
                                     _mongocrypt_buffer_t *out,
                                     uint32_t *bytes_written,
@@ -105,7 +107,7 @@ _native_crypto_aes_256_cbc_decrypt (const _mongocrypt_buffer_t *key,
 
 bool
 _native_crypto_hmac_sha_512 (const _mongocrypt_buffer_t *key,
-                             _mongocrypt_buffer_t *in_array,
+                             const _mongocrypt_buffer_t *in_array,
                              uint32_t in_count,
                              _mongocrypt_buffer_t *out,
                              mongocrypt_status_t *status);

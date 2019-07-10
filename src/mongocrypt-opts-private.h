@@ -20,7 +20,6 @@
 #include "mongocrypt.h"
 #include "mongocrypt-buffer-private.h"
 #include "mongocrypt-log-private.h"
-#include "mongocrypt-crypto-private.h"
 
 /* KMS providers are used in a bit set.
  *

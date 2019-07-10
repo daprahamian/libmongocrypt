@@ -33,7 +33,7 @@ _native_crypto_init ()
 bool
 _native_crypto_aes_256_cbc_encrypt (const _mongocrypt_buffer_t *key,
                                     const _mongocrypt_buffer_t *iv,
-                                    _mongocrypt_buffer_t *in_array,
+                                    const _mongocrypt_buffer_t *in_array,
                                     uint32_t in_count,
                                     _mongocrypt_buffer_t *out,
                                     uint32_t *bytes_written,
@@ -61,10 +61,10 @@ _native_crypto_aes_256_cbc_encrypt (const _mongocrypt_buffer_t *key,
    *bytes_written = 0;
    for (i = 0; i < in_count; i++) {
       cc_status = CCCryptorUpdate (ctx,
-                                   in->data,
-                                   in->len,
-                                   out->data,
-                                   out->len,
+                                   in_array[i].data,
+                                   in_array[i].len,
+                                   out->data + *bytes_written,
+                                   out->len - *bytes_written,
                                    &intermediate_bytes_written);
       if (cc_status != kCCSuccess) {
          CLIENT_ERR ("error encrypting: %d", (int) cc_status);
@@ -74,8 +74,8 @@ _native_crypto_aes_256_cbc_encrypt (const _mongocrypt_buffer_t *key,
    }
 
    cc_status =
-      CCCryptorFinal (ctx, out->data, out->len, &intermediate_bytes_written);
-   *bytes_written = intermediate_bytes_written;
+      CCCryptorFinal (ctx, out->data + *bytes_written, out->len - *bytes_written, &intermediate_bytes_written);
+   *bytes_written += intermediate_bytes_written;
 
    if (cc_status != kCCSuccess) {
       CLIENT_ERR ("error finalizing: %d", (int) cc_status);
@@ -96,7 +96,8 @@ done:
  * functions except for the kCCDecrypt and the error message. */
 bool
 _native_crypto_aes_256_cbc_decrypt (const _mongocrypt_buffer_t *key,
-                                    _mongocrypt_buffer_t *in_array,
+                                    const _mongocrypt_buffer_t *iv,
+                                    const _mongocrypt_buffer_t *in_array,
                                     uint32_t in_count,
                                     _mongocrypt_buffer_t *out,
                                     uint32_t *bytes_written,
@@ -124,10 +125,10 @@ _native_crypto_aes_256_cbc_decrypt (const _mongocrypt_buffer_t *key,
    *bytes_written = 0;
    for (i = 0; i < in_count; i++) {
       cc_status = CCCryptorUpdate (ctx,
-                                   in->data,
-                                   in->len,
-                                   out->data,
-                                   out->len,
+                                   in_array[i].data,
+                                   in_array[i].len,
+                                   out->data + *bytes_written,
+                                   out->len - *bytes_written,
                                    &intermediate_bytes_written);
       if (cc_status != kCCSuccess) {
          CLIENT_ERR ("error decrypting: %d", (int) cc_status);
@@ -137,8 +138,8 @@ _native_crypto_aes_256_cbc_decrypt (const _mongocrypt_buffer_t *key,
    }
 
    cc_status =
-      CCCryptorFinal (ctx, out->data, out->len, &intermediate_bytes_written);
-   *bytes_written = intermediate_bytes_written;
+      CCCryptorFinal (ctx, out->data + *bytes_written, out->len - *bytes_written, &intermediate_bytes_written);
+   *bytes_written += intermediate_bytes_written;
 
    if (cc_status != kCCSuccess) {
       CLIENT_ERR ("error finalizing: %d", (int) cc_status);
@@ -158,7 +159,7 @@ done:
 /* CCHmac functions don't return errors. */
 bool
 _native_crypto_hmac_sha_512 (const _mongocrypt_buffer_t *key,
-                             _mongocrypt_buffer_t *in_array,
+                             const _mongocrypt_buffer_t *in_array,
                              uint32_t in_count,
                              _mongocrypt_buffer_t *out,
                              mongocrypt_status_t *status)
@@ -176,7 +177,7 @@ _native_crypto_hmac_sha_512 (const _mongocrypt_buffer_t *key,
    CCHmacInit (ctx, kCCHmacAlgSHA512, key->data, key->len);
 
    for (i = 0; i < in_count; i++) {
-      CCHmacUpdate (ctx, in_array[i]->data, in_array[i]->len);
+      CCHmacUpdate (ctx, in_array[i].data, in_array[i].len);
    }
 
    CCHmacFinal (ctx, out->data);

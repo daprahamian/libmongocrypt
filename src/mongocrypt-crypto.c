@@ -33,18 +33,18 @@ static bool
 _crypto_aes_256_cbc_encrypt (_mongocrypt_crypto_t *crypto,
                              const _mongocrypt_buffer_t *enc_key,
                              const _mongocrypt_buffer_t *iv,
-                             _mongocrypt_buffer_t *in_array,
+                             const _mongocrypt_buffer_t *in_array,
                              uint32_t in_count,
                              _mongocrypt_buffer_t *out,
                              uint32_t *bytes_written,
                              mongocrypt_status_t *status)
 {
-   if (enc_key.len != MONGOCRYPT_ENC_KEY_LEN) {
+   if (enc_key->len != MONGOCRYPT_ENC_KEY_LEN) {
       CLIENT_ERR ("invalid encryption key length");
       return false;
    }
 
-   if (iv.len != MONGOCRYPT_IV_LEN) {
+   if (iv->len != MONGOCRYPT_IV_LEN) {
       CLIENT_ERR ("invalid iv length");
       return false;
    }
@@ -55,21 +55,22 @@ _crypto_aes_256_cbc_encrypt (_mongocrypt_crypto_t *crypto,
    }
 
    /* TODO: If there's a hook set, create a binary and call it. */
-   return _native_aes_256_cbc_encrypt (
+   return _native_crypto_aes_256_cbc_encrypt (
       enc_key, iv, in_array, in_count, out, bytes_written, status);
 }
 
 
 static bool
 _crypto_aes_256_cbc_decrypt (_mongocrypt_crypto_t *crypto,
+                             const _mongocrypt_buffer_t *iv,
                              const _mongocrypt_buffer_t *enc_key,
-                             _mongocrypt_buffer_t *in_array,
+                             const _mongocrypt_buffer_t *in_array,
                              uint32_t in_count,
                              _mongocrypt_buffer_t *out,
                              uint32_t *bytes_written,
                              mongocrypt_status_t *status)
 {
-   if (enc_key.len != MONGOCRYPT_ENC_KEY_LEN) {
+   if (enc_key->len != MONGOCRYPT_ENC_KEY_LEN) {
       CLIENT_ERR ("invalid encryption key length");
       return false;
    }
@@ -79,20 +80,20 @@ _crypto_aes_256_cbc_decrypt (_mongocrypt_crypto_t *crypto,
       return false;
    }
 
-   return _native_aes_256_cbc_decrypt (
-      enc_key, in_array, in_count, out, bytes_written, status);
+   return _native_crypto_aes_256_cbc_decrypt (
+      enc_key, iv, in_array, in_count, out, bytes_written, status);
 }
 
 
 static bool
 _crypto_hmac_sha_512 (_mongocrypt_crypto_t *crypto,
                       const _mongocrypt_buffer_t *hmac_key,
-                      _mongocrypt_buffer_t *in_array,
+                      const _mongocrypt_buffer_t *in_array,
                       uint32_t in_count,
                       _mongocrypt_buffer_t *out,
                       mongocrypt_status_t *status)
 {
-   if (hmac_key.len != MONGOCRYPT_HMAC_KEY_LEN) {
+   if (hmac_key->len != MONGOCRYPT_MAC_KEY_LEN) {
       CLIENT_ERR ("invalid hmac key length");
       return false;
    }
@@ -101,7 +102,8 @@ _crypto_hmac_sha_512 (_mongocrypt_crypto_t *crypto,
       CLIENT_ERR ("no input provided");
       return false;
    }
-   return _native_hmac_sha_512 (hmac_key, in_array, in_count, out, status);
+   return _native_crypto_hmac_sha_512 (
+      hmac_key, in_array, in_count, out, status);
 }
 
 
@@ -211,7 +213,8 @@ _mongocrypt_calculate_plaintext_len (uint32_t ciphertext_len)
  * ----------------------------------------------------------------------------
  */
 static bool
-_encrypt_step (const _mongocrypt_buffer_t *iv,
+_encrypt_step (_mongocrypt_crypto_t *crypto,
+               const _mongocrypt_buffer_t *iv,
                const _mongocrypt_buffer_t *enc_key,
                const _mongocrypt_buffer_t *plaintext,
                _mongocrypt_buffer_t *ciphertext,
@@ -257,12 +260,18 @@ _encrypt_step (const _mongocrypt_buffer_t *iv,
       memset (intermediates[1].data, padding_byte, padding_byte);
    }
 
-   BSON_ASSERT (*bytes_written % MONGOCRYPT_BLOCK_SIZE == 0);
-
-   if (!_crypto_aes_256_cbc_encrypt (
-          crypto, enc_key, iv, intermediates, 2, out, bytes_written, status)) {
+   if (!_crypto_aes_256_cbc_encrypt (crypto,
+                                     enc_key,
+                                     iv,
+                                     intermediates,
+                                     2,
+                                     ciphertext,
+                                     bytes_written,
+                                     status)) {
       return false;
    }
+
+   BSON_ASSERT (*bytes_written % MONGOCRYPT_BLOCK_SIZE == 0);
 
    return true;
 }
@@ -294,7 +303,8 @@ _encrypt_step (const _mongocrypt_buffer_t *iv,
  * ----------------------------------------------------------------------------
  */
 static bool
-_hmac_step (const _mongocrypt_buffer_t *mac_key,
+_hmac_step (_mongocrypt_crypto_t *crypto,
+            const _mongocrypt_buffer_t *mac_key,
             const _mongocrypt_buffer_t *associated_data,
             const _mongocrypt_buffer_t *ciphertext,
             _mongocrypt_buffer_t *out,
@@ -302,7 +312,6 @@ _hmac_step (const _mongocrypt_buffer_t *mac_key,
 {
    _mongocrypt_buffer_t intermediates[3];
    uint64_t associated_data_len_be;
-   uint32_t bytes_written;
    uint8_t tag_storage[64];
    _mongocrypt_buffer_t tag;
 
@@ -326,11 +335,11 @@ _hmac_step (const _mongocrypt_buffer_t *mac_key,
    _mongocrypt_buffer_init (&intermediates[0]);
    _mongocrypt_buffer_init (&intermediates[1]);
    _mongocrypt_buffer_init (&intermediates[2]);
-   intermediates[0].data = associated_data.data;
-   intermediates[0].len = associated_data.len;
+   intermediates[0].data = associated_data->data;
+   intermediates[0].len = associated_data->len;
    /* Add ciphertext. */
-   intermediates[1].data = ciphertext.data;
-   intermediates[1].len = ciphertext.len;
+   intermediates[1].data = ciphertext->data;
+   intermediates[1].len = ciphertext->len;
    /* Add associated data length in bits. */
    associated_data_len_be = 8 * associated_data->len;
    associated_data_len_be = BSON_UINT64_TO_BE (associated_data_len_be);
@@ -340,12 +349,10 @@ _hmac_step (const _mongocrypt_buffer_t *mac_key,
    tag.len = sizeof (tag_storage);
 
 
-   if (!_crypto_hmac_finalize (
+   if (!_crypto_hmac_sha_512 (
           crypto, mac_key, intermediates, 3, &tag, status)) {
       return false;
    }
-
-   BSON_ASSERT (MONGOCRYPT_HMAC_SHA512_LEN == bytes_written); /* TODO: assert */
 
    /* [MCGREW 2.7] "The HMAC-SHA-512 value is truncated to T_LEN=32 octets" */
    memcpy (out->data, tag.data, MONGOCRYPT_HMAC_LEN);
@@ -382,7 +389,8 @@ _hmac_step (const _mongocrypt_buffer_t *mac_key,
  * ----------------------------------------------------------------------------
  */
 bool
-_mongocrypt_do_encryption (const _mongocrypt_buffer_t *iv,
+_mongocrypt_do_encryption (_mongocrypt_crypto_t *crypto,
+                           const _mongocrypt_buffer_t *iv,
                            const _mongocrypt_buffer_t *associated_data,
                            const _mongocrypt_buffer_t *key,
                            const _mongocrypt_buffer_t *plaintext,
@@ -394,12 +402,13 @@ _mongocrypt_do_encryption (const _mongocrypt_buffer_t *iv,
                         intermediate_hmac = {0}, empty_buffer = {0};
    uint32_t intermediate_bytes_written = 0;
 
+   memset (ciphertext->data, 0, ciphertext->len);
+
    BSON_ASSERT (iv);
    BSON_ASSERT (key);
    BSON_ASSERT (plaintext);
    BSON_ASSERT (ciphertext);
-   BSON_ASSERT (ciphertext->len >=
-                _mongocrypt_calculate_ciphertext_len (plaintext->len));
+   BSON_ASSERT (ciphertext->len >= _mongocrypt_calculate_ciphertext_len (plaintext->len));
 
    *bytes_written = 0;
    intermediate.len = ciphertext->len;
@@ -420,7 +429,8 @@ _mongocrypt_do_encryption (const _mongocrypt_buffer_t *iv,
    *bytes_written += iv->len;
 
    /* [MCGREW]: Steps 2 & 3. */
-   if (!_encrypt_step (iv,
+   if (!_encrypt_step (crypto,
+                       iv,
                        &enc_key,
                        plaintext,
                        &intermediate,
@@ -439,7 +449,8 @@ _mongocrypt_do_encryption (const _mongocrypt_buffer_t *iv,
    intermediate.len = *bytes_written;
 
    /* [MCGREW]: Steps 4 & 5, compute the HMAC. */
-   if (!_hmac_step (&mac_key,
+   if (!_hmac_step (crypto,
+                    &mac_key,
                     associated_data ? associated_data : &empty_buffer,
                     &intermediate,
                     &intermediate_hmac,
@@ -497,8 +508,14 @@ _decrypt_step (_mongocrypt_crypto_t *crypto,
       return false;
    }
 
-   if (!_crypt_aes_256_cbc_decrypt (
-          crypto, enc_key, ciphertext, 1, plaintext, bytes_written, status)) {
+   if (!_crypto_aes_256_cbc_decrypt (crypto,
+                                     iv,
+                                     enc_key,
+                                     ciphertext,
+                                     1,
+                                     plaintext,
+                                     bytes_written,
+                                     status)) {
       return false;
    }
 
@@ -537,7 +554,8 @@ _decrypt_step (_mongocrypt_crypto_t *crypto,
  * ----------------------------------------------------------------------------
  */
 bool
-_mongocrypt_do_decryption (const _mongocrypt_buffer_t *associated_data,
+_mongocrypt_do_decryption (_mongocrypt_crypto_t *crypto,
+                           const _mongocrypt_buffer_t *associated_data,
                            const _mongocrypt_buffer_t *key,
                            const _mongocrypt_buffer_t *ciphertext,
                            _mongocrypt_buffer_t *plaintext,
@@ -580,7 +598,8 @@ _mongocrypt_do_decryption (const _mongocrypt_buffer_t *associated_data,
    hmac_tag.len = MONGOCRYPT_HMAC_LEN;
 
    /* [MCGREW 2.2]: Step 3: HMAC check. */
-   if (!_hmac_step (&mac_key,
+   if (!_hmac_step (crypto,
+                    &mac_key,
                     associated_data ? associated_data : &empty_buffer,
                     &intermediate,
                     &hmac_tag,
@@ -602,8 +621,13 @@ _mongocrypt_do_decryption (const _mongocrypt_buffer_t *associated_data,
    intermediate.len =
       ciphertext->len - (MONGOCRYPT_IV_LEN + MONGOCRYPT_HMAC_LEN);
 
-   if (!_decrypt_step (
-          &iv, &enc_key, &intermediate, plaintext, bytes_written, status)) {
+   if (!_decrypt_step (crypto,
+                       &iv,
+                       &enc_key,
+                       &intermediate,
+                       plaintext,
+                       bytes_written,
+                       status)) {
       goto done;
    }
 
@@ -679,7 +703,6 @@ _mongocrypt_calculate_deterministic_iv (
    _mongocrypt_buffer_t intermediates[3];
    _mongocrypt_buffer_t iv_key;
    uint64_t associated_data_len_be;
-   uint32_t bytes_written;
    uint8_t tag_storage[64];
    _mongocrypt_buffer_t tag;
 
@@ -699,25 +722,24 @@ _mongocrypt_calculate_deterministic_iv (
    _mongocrypt_buffer_init (&intermediates[1]);
    _mongocrypt_buffer_init (&intermediates[2]);
    /* Add associated data. */
-   intermediates[0].data = associated_data.data;
-   intermediates[0].len = associated_data.len;
+   intermediates[0].data = associated_data->data;
+   intermediates[0].len = associated_data->len;
    /* Add associated data length in bits. */
    associated_data_len_be = 8 * associated_data->len;
    associated_data_len_be = BSON_UINT64_TO_BE (associated_data_len_be);
    intermediates[1].data = (uint8_t *) &associated_data_len_be;
    intermediates[1].len = sizeof (uint64_t);
    /* Add plaintext. */
-   intermediates[2].data = plaintext.data;
-   intermediates[2].len = plaintext.len;
+   intermediates[2].data = (uint8_t *) plaintext->data;
+   intermediates[2].len = plaintext->len;
 
    tag.data = tag_storage;
    tag.len = sizeof (tag_storage);
 
-   if (!_crypto_hmac_sha_512 (crypto, iv_key, intermediates, 3, tag, status)) {
+   if (!_crypto_hmac_sha_512 (
+          crypto, &iv_key, intermediates, 3, &tag, status)) {
       return false;
    }
-
-   BSON_ASSERT (MONGOCRYPT_HMAC_SHA512_LEN == bytes_written);
 
    /* Truncate to IV length */
    memcpy (out->data, tag.data, MONGOCRYPT_IV_LEN);
