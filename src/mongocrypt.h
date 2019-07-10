@@ -853,8 +853,15 @@ typedef bool (*mongocrypt_crypto_fn) (void *ctx,
                                       uint32_t *bytes_written,
                                       mongocrypt_status_t *status);
 
-typedef bool (*mongocrypt_hash_fn) (void *ctx,
+typedef bool (*mongocrypt_hmac_fn) (void *ctx,
                                     mongocrypt_binary_t *key,
+                                    mongocrypt_binary_t *in_array,
+                                    uint32_t in_count,
+                                    mongocrypt_binary_t *out,
+                                    mongocrypt_status_t *status);
+
+
+typedef bool (*mongocrypt_hash_fn) (void *ctx,
                                     mongocrypt_binary_t *in_array,
                                     uint32_t in_count,
                                     mongocrypt_binary_t *out,
@@ -870,8 +877,8 @@ mongocrypt_setopt_crypto_hooks (mongocrypt_t *crypt,
                                 mongocrypt_crypto_fn aes_256_cbc_encrypt,
                                 mongocrypt_crypto_fn aes_256_cbc_decrypt,
                                 mongocrypt_random_fn random,
-                                mongocrypt_hash_fn hmac_sha_512,
-                                mongocrypt_hash_fn hmac_sha_256,
+                                mongocrypt_hmac_fn hmac_sha_512,
+                                mongocrypt_hmac_fn hmac_sha_256,
                                 mongocrypt_hash_fn sha_256,
                                 void *ctx);
 

@@ -34,36 +34,27 @@
 static bool
 _sha256 (void *ctx, const char *input, size_t len, unsigned char *hash_out)
 {
-   #define SHA256_LEN 32
+#define SHA256_LEN 32
+   bool ret;
    mongocrypt_status_t *status;
-   _mongocrypt_crypto_t *crypto = (_mongocrypt_crypto_t*) ctx;
+   _mongocrypt_crypto_t *crypto = (_mongocrypt_crypto_t *) ctx;
    mongocrypt_binary_t *plaintext, *out;
 
    (void) crypto;
 
    status = mongocrypt_status_new ();
-   plaintext = mongocrypt_binary_new_from_data ((uint8_t*)input, len);
-   out = mongocrypt_binary_new();
+   plaintext = mongocrypt_binary_new_from_data ((uint8_t *) input, len);
+   out = mongocrypt_binary_new ();
 
    out->data = hash_out;
    out->len = SHA256_LEN;
 
-   // hash_ctx = crypto->hash_sha_256_new (status);
-   // if (!hash_ctx) {
-   //    return false;
-   // }
-   // if (!crypto->hash_update (hash_ctx, plaintext, status)) {
-   //    return false;
-   // }
-   // if (!crypto->hash_finalize (hash_ctx, out, status)) {
-   //    return false;
-   // }
-   // crypto->hash_destroy (hash_ctx);
+   ret = crypto->sha_256 (crypto->ctx, plaintext, 1, out, status);
 
    mongocrypt_status_destroy (status);
    mongocrypt_binary_destroy (plaintext);
    mongocrypt_binary_destroy (out);
-   return true;
+   return ret;
 }
 
 static bool
@@ -74,38 +65,29 @@ _sha256_hmac (void *ctx,
               size_t len,
               unsigned char *hash_out)
 {
-   #define SHA256_LEN 32
+#define SHA256_LEN 32
    mongocrypt_status_t *status;
-   _mongocrypt_crypto_t *crypto = (_mongocrypt_crypto_t*) ctx;
+   _mongocrypt_crypto_t *crypto = (_mongocrypt_crypto_t *) ctx;
    mongocrypt_binary_t *key, *plaintext, *out;
+   bool ret;
 
    (void) crypto;
 
    status = mongocrypt_status_new ();
-   key = mongocrypt_binary_new_from_data ((uint8_t*)key_input, key_len);
-   plaintext = mongocrypt_binary_new_from_data ((uint8_t*)input, len);
-   out = mongocrypt_binary_new();
+   key = mongocrypt_binary_new_from_data ((uint8_t *) key_input, key_len);
+   plaintext = mongocrypt_binary_new_from_data ((uint8_t *) input, len);
+   out = mongocrypt_binary_new ();
 
    out->data = hash_out;
    out->len = SHA256_LEN;
 
-   // hmac_ctx = crypto->hmac_sha_256_new (key, status);
-   // if (!hmac_ctx) {
-   //    return false;
-   // }
-   // if (!crypto->hmac_update (hmac_ctx, plaintext, status)) {
-   //    return false;
-   // }
-   // if (!crypto->hmac_finalize (hmac_ctx, out, status)) {
-   //    return false;
-   // }
-   // crypto->hmac_destroy (hmac_ctx);
+   ret = crypto->hmac_sha_256 (crypto->ctx, key, plaintext, 1, out, status);
 
    mongocrypt_status_destroy (status);
    mongocrypt_binary_destroy (key);
    mongocrypt_binary_destroy (plaintext);
    mongocrypt_binary_destroy (out);
-   return true;
+   return ret;
 }
 
 static void

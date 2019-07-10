@@ -159,7 +159,6 @@ _test_mcgrew (_mongocrypt_tester_t *tester)
                                     status);
    BSON_ASSERT (ret);
    BSON_ASSERT (ciphertext_actual.len == ciphertext_expected.len);
-   printf("got %s\n", _mongocrypt_buffer_to_hex (&ciphertext_actual));
    BSON_ASSERT (0 == memcmp (ciphertext_actual.data,
                              ciphertext_expected.data,
                              ciphertext_actual.len));

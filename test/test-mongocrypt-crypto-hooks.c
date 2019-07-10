@@ -71,7 +71,7 @@ _aes_256_cbc_encrypt (void *ctx,
 {
    int i = 0;
 
-   BSON_ASSERT (0 == strcmp("context", (char*) ctx));
+   BSON_ASSERT (0 == strcmp ("context", (char *) ctx));
    bson_string_append_printf (call_history, "call:%s\n", BSON_FUNC);
    _append_bin ("key", key);
    _append_bin ("iv", iv);
@@ -97,7 +97,7 @@ _aes_256_cbc_decrypt (void *ctx,
 {
    int i = 0;
 
-   BSON_ASSERT (0 == strcmp("context", (char*) ctx));
+   BSON_ASSERT (0 == strcmp ("context", (char *) ctx));
    bson_string_append_printf (call_history, "call:%s\n", BSON_FUNC);
    _append_bin ("key", key);
    _append_bin ("iv", iv);
@@ -122,7 +122,7 @@ _hmac_sha_512 (void *ctx,
    _mongocrypt_buffer_t tmp;
    int i;
 
-   BSON_ASSERT (0 == strcmp("context", (char*) ctx));
+   BSON_ASSERT (0 == strcmp ("context", (char *) ctx));
    bson_string_append_printf (call_history, "call:%s\n", BSON_FUNC);
    _append_bin ("key", key);
    for (i = 0; i < in_count; i++) {
@@ -148,7 +148,7 @@ _hmac_sha_256 (void *ctx,
    int i;
    _mongocrypt_buffer_t tmp;
 
-   BSON_ASSERT (0 == strcmp("context", (char*) ctx));
+   BSON_ASSERT (0 == strcmp ("context", (char *) ctx));
    bson_string_append_printf (call_history, "call:%s\n", BSON_FUNC);
    _append_bin ("key", key);
    for (i = 0; i < in_count; i++) {
@@ -165,7 +165,6 @@ _hmac_sha_256 (void *ctx,
 
 bool
 _sha_256 (void *ctx,
-          mongocrypt_binary_t *key,
           mongocrypt_binary_t *in_array,
           uint32_t in_count,
           mongocrypt_binary_t *out,
@@ -174,9 +173,8 @@ _sha_256 (void *ctx,
    int i;
    _mongocrypt_buffer_t tmp;
 
-   BSON_ASSERT (0 == strcmp("context", (char*) ctx));
+   BSON_ASSERT (0 == strcmp ("context", (char *) ctx));
    bson_string_append_printf (call_history, "call:%s\n", BSON_FUNC);
-   _append_bin ("key", key);
    for (i = 0; i < in_count; i++) {
       _append_bin ("in", &in_array[i]);
    }
@@ -241,7 +239,19 @@ _test_crypto_hooks_encryption (_mongocrypt_tester_t *tester)
    uint32_t bytes_written;
    mongocrypt_status_t *status;
    _mongocrypt_buffer_t iv, associated_data, key, plaintext, ciphertext;
-   const char *expected_call_history = "";
+   const char *expected_call_history =
+      "call:_aes_256_cbc_encrypt\n"
+      "key:" ENCRYPTION_KEY_HEX "\n"
+      "iv:" IV_HEX "\n"
+      "in:\n"
+      "in:BBBB0E0E0E0E0E0E0E0E0E0E0E0E0E0E\n"
+      "ret:_aes_256_cbc_encrypt\n"
+      "call:_hmac_sha_512\n"
+      "key:CCD3836C8F24AC5FAAFAAA630C5C6C5D210FD03934EA1440CD67E0DCDE3F8EA6\n"
+      "in:AAAA\n"
+      "in:" IV_HEX "BBBB0E0E0E0E0E0E0E0E0E0E0E0E0E0E\n"
+      "in:0000000000000010\n"
+      "ret:_hmac_sha_512\n";
 
    status = mongocrypt_status_new ();
    crypt = _create_mongocrypt ();
@@ -269,7 +279,6 @@ _test_crypto_hooks_encryption (_mongocrypt_tester_t *tester)
    ciphertext.len = bytes_written;
 
    /* Check the full trace. */
-   printf("%s\n", call_history->str);
    BSON_ASSERT (0 == strcmp (call_history->str, expected_call_history));
 
    /* Check the structure of the ciphertext */
@@ -301,7 +310,18 @@ _test_crypto_hooks_decryption (_mongocrypt_tester_t *tester)
    uint32_t bytes_written;
    mongocrypt_status_t *status;
    _mongocrypt_buffer_t associated_data, key, plaintext, ciphertext;
-   const char *expected_call_history = "";
+   const char *expected_call_history =
+      "call:_hmac_sha_512\n"
+      "key:" HMAC_KEY_HEX "\n"
+      "in:AAAA\n"
+      "in:" IV_HEX "BBBB0E0E0E0E0E0E0E0E0E0E0E0E0E0E\n"
+      "in:0000000000000010\n"
+      "ret:_hmac_sha_512\n"
+      "call:_aes_256_cbc_decrypt\n"
+      "key:" ENCRYPTION_KEY_HEX "\n"
+      "iv:" IV_HEX "\n"
+      "in:BBBB0E0E0E0E0E0E0E0E0E0E0E0E0E0E\n"
+      "ret:_aes_256_cbc_decrypt\n";
 
    status = mongocrypt_status_new ();
    crypt = _create_mongocrypt ();
@@ -352,7 +372,12 @@ _test_crypto_hooks_iv_gen (_mongocrypt_tester_t *tester)
    _mongocrypt_buffer_t associated_data, key, plaintext, iv;
    char *expected_iv = bson_strndup (
       HMAC_HEX_TAG, 16 * 2); /* only the first 16 bytes are used for IV. */
-   const char *expected_call_history = "";
+   const char *expected_call_history = "call:_hmac_sha_512\n"
+                                       "key:" IV_KEY_HEX "\n"
+                                       "in:AAAA\n"
+                                       "in:0000000000000010\n"
+                                       "in:BBBB\n"
+                                       "ret:_hmac_sha_512\n";
 
    status = mongocrypt_status_new ();
    crypt = _create_mongocrypt ();
