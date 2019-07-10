@@ -31,6 +31,13 @@
 
 typedef struct {
    int hooks_enabled;
+   mongocrypt_crypto_fn aes_256_cbc_encrypt;
+   mongocrypt_crypto_fn aes_256_cbc_decrypt;
+   mongocrypt_random_fn random;
+   mongocrypt_hash_fn hmac_sha_512;
+   mongocrypt_hash_fn hmac_sha_256;
+   mongocrypt_hash_fn sha_256;
+   void *ctx;
 } _mongocrypt_crypto_t;
 
 uint32_t

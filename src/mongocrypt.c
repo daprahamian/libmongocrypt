@@ -318,7 +318,8 @@ mongocrypt_init (mongocrypt_t *crypt)
 
    crypt->initialized = true;
 
-   if (0 != _mongocrypt_once (_mongocrypt_do_init) || !(_native_crypto_initialized)) {
+   if (0 != _mongocrypt_once (_mongocrypt_do_init) ||
+       !(_native_crypto_initialized)) {
       CLIENT_ERR ("failed to initialize");
       return false;
    }
@@ -395,56 +396,14 @@ _mongocrypt_validate_and_copy_string (const char *in,
 
 
 bool
-mongocrypt_setopt_crypto_hooks (
-   mongocrypt_t *crypt,
-   void *(*encrypt_aes_256_cbc_new) (mongocrypt_binary_t *key,
-                                     mongocrypt_binary_t *iv,
-                                     mongocrypt_status_t *status),
-   bool (*encrypt_update) (void *ctx,
-                           mongocrypt_binary_t *in,
-                           mongocrypt_binary_t *out,
-                           uint32_t *bytes_written,
-                           mongocrypt_status_t *status),
-   bool (*encrypt_finalize) (void *ctx,
-                             mongocrypt_binary_t *out,
-                             uint32_t *bytes_written,
-                             mongocrypt_status_t *status),
-   void (*encrypt_destroy) (void *ctx),
-   void *(*decrypt_aes_256_cbc_new) (mongocrypt_binary_t *key,
-                                     mongocrypt_binary_t *iv,
-                                     mongocrypt_status_t *status),
-   bool (*decrypt_update) (void *ctx,
-                           mongocrypt_binary_t *in,
-                           mongocrypt_binary_t *out,
-                           uint32_t *bytes_written,
-                           mongocrypt_status_t *status),
-   bool (*decrypt_finalize) (void *ctx,
-                             mongocrypt_binary_t *out,
-                             uint32_t *bytes_written,
-                             mongocrypt_status_t *status),
-   void (*decrypt_destroy) (void *ctx),
-   void *(*hmac_sha_512_new) (mongocrypt_binary_t *key,
-                              mongocrypt_status_t *status),
-   void *(*hmac_sha_256_new) (mongocrypt_binary_t *key,
-                              mongocrypt_status_t *status),
-   bool (*hmac_update) (void *ctx,
-                        mongocrypt_binary_t *in,
-                        mongocrypt_status_t *status),
-   bool (*hmac_finalize) (void *ctx,
-                          mongocrypt_binary_t *out,
-                          mongocrypt_status_t *status),
-   void (*hmac_destroy) (void *ctx),
-   void *(*hash_sha_256_new) (mongocrypt_status_t *status),
-   bool (*hash_update) (void *ctx,
-                        mongocrypt_binary_t *in,
-                        mongocrypt_status_t *status),
-   bool (*hash_finalize) (void *ctx,
-                          mongocrypt_binary_t *out,
-                          mongocrypt_status_t *status),
-   void (*hash_destroy) (void *ctx),
-   bool (*random) (mongocrypt_binary_t *out,
-                   uint32_t count,
-                   mongocrypt_status_t *status))
+mongocrypt_setopt_crypto_hooks (mongocrypt_t *crypt,
+                                mongocrypt_crypto_fn aes_256_cbc_encrypt,
+                                mongocrypt_crypto_fn aes_256_cbc_decrypt,
+                                mongocrypt_random_fn random,
+                                mongocrypt_hash_fn hmac_sha_512,
+                                mongocrypt_hash_fn hmac_sha_256,
+                                mongocrypt_hash_fn sha_256,
+                                void *ctx)
 {
    mongocrypt_status_t *status = crypt->status;
 
@@ -459,7 +418,38 @@ mongocrypt_setopt_crypto_hooks (
    }
 
    crypt->crypto = bson_malloc0 (sizeof (*crypt->crypto));
+   crypt->crypto->ctx = ctx;
 
+   if (!aes_256_cbc_encrypt) {
+      CLIENT_ERR ("aes_256_cbc_encrypt not set");
+      return false;
+   }
+   crypt->crypto->aes_256_cbc_encrypt = aes_256_cbc_encrypt;
+   if (!aes_256_cbc_decrypt) {
+      CLIENT_ERR ("aes_256_cbc_decrypt not set");
+      return false;
+   }
+   crypt->crypto->aes_256_cbc_decrypt = aes_256_cbc_decrypt;
+   if (!random) {
+      CLIENT_ERR ("random not set");
+      return false;
+   }
+   crypt->crypto->random = random;
+   if (!hmac_sha_512) {
+      CLIENT_ERR ("hmac_sha_512 not set");
+      return false;
+   }
+   crypt->crypto->hmac_sha_512 = hmac_sha_512;
+   if (!hmac_sha_256) {
+      CLIENT_ERR ("hmac_sha_256 not set");
+      return false;
+   }
+   crypt->crypto->hmac_sha_256 = hmac_sha_256;
+   if (!sha_256) {
+      CLIENT_ERR ("sha_256 not set");
+      return false;
+   }
+   crypt->crypto->sha_256 = sha_256;
 
    return true;
 }

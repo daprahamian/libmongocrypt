@@ -843,57 +843,37 @@ mongocrypt_ctx_destroy (mongocrypt_ctx_t *ctx);
  * TODO: finish documenting.
  *
  */
+
+typedef bool (*mongocrypt_crypto_fn) (void *ctx,
+                                      mongocrypt_binary_t *key,
+                                      mongocrypt_binary_t *iv,
+                                      mongocrypt_binary_t *in_array,
+                                      uint32_t in_count,
+                                      mongocrypt_binary_t *out,
+                                      uint32_t *bytes_written,
+                                      mongocrypt_status_t *status);
+
+typedef bool (*mongocrypt_hash_fn) (void *ctx,
+                                    mongocrypt_binary_t *key,
+                                    mongocrypt_binary_t *in_array,
+                                    uint32_t in_count,
+                                    mongocrypt_binary_t *out,
+                                    mongocrypt_status_t *status);
+
+typedef bool (*mongocrypt_random_fn) (void *ctx,
+                                      mongocrypt_binary_t *out,
+                                      uint32_t count,
+                                      mongocrypt_status_t *status);
+
 bool
-mongocrypt_setopt_crypto_hooks (
-   mongocrypt_t *crypt,
-   void *(*encrypt_aes_256_cbc_new) (mongocrypt_binary_t *key,
-                                     mongocrypt_binary_t *iv,
-                                     mongocrypt_status_t *status),
-   bool (*encrypt_update) (void *ctx,
-                           mongocrypt_binary_t *in,
-                           mongocrypt_binary_t *out,
-                           uint32_t *bytes_written,
-                           mongocrypt_status_t *status),
-   bool (*encrypt_finalize) (void *ctx,
-                             mongocrypt_binary_t *out,
-                             uint32_t *bytes_written,
-                             mongocrypt_status_t *status),
-   void (*encrypt_destroy) (void *ctx),
-   void *(*decrypt_aes_256_cbc_new) (mongocrypt_binary_t *key,
-                                     mongocrypt_binary_t *iv,
-                                     mongocrypt_status_t *status),
-   bool (*decrypt_update) (void *ctx,
-                           mongocrypt_binary_t *in,
-                           mongocrypt_binary_t *out,
-                           uint32_t *bytes_written,
-                           mongocrypt_status_t *status),
-   bool (*decrypt_finalize) (void *ctx,
-                             mongocrypt_binary_t *out,
-                             uint32_t *bytes_written,
-                             mongocrypt_status_t *status),
-   void (*decrypt_destroy) (void *ctx),
-   void *(*hmac_sha_512_new) (mongocrypt_binary_t *key,
-                              mongocrypt_status_t *status),
-   void *(*hmac_sha_256_new) (mongocrypt_binary_t *key,
-                              mongocrypt_status_t *status),
-   bool (*hmac_update) (void *ctx,
-                        mongocrypt_binary_t *in,
-                        mongocrypt_status_t *status),
-   bool (*hmac_finalize) (void *ctx,
-                          mongocrypt_binary_t *out,
-                          mongocrypt_status_t *status),
-   void (*hmac_destroy) (void *ctx),
-   void *(*hash_sha_256_new) (mongocrypt_status_t *status),
-   bool (*hash_update) (void *ctx,
-                        mongocrypt_binary_t *in,
-                        mongocrypt_status_t *status),
-   bool (*hash_finalize) (void *ctx,
-                          mongocrypt_binary_t *out,
-                          mongocrypt_status_t *status),
-   void (*hash_destroy) (void *ctx),
-   bool (*random) (mongocrypt_binary_t *out,
-                   uint32_t count,
-                   mongocrypt_status_t *status));
+mongocrypt_setopt_crypto_hooks (mongocrypt_t *crypt,
+                                mongocrypt_crypto_fn aes_256_cbc_encrypt,
+                                mongocrypt_crypto_fn aes_256_cbc_decrypt,
+                                mongocrypt_random_fn random,
+                                mongocrypt_hash_fn hmac_sha_512,
+                                mongocrypt_hash_fn hmac_sha_256,
+                                mongocrypt_hash_fn sha_256,
+                                void *ctx);
 
 
 #endif /* MONGOCRYPT_H */
