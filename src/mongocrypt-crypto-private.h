@@ -30,7 +30,7 @@
 #define MONGOCRYPT_BLOCK_SIZE 16
 
 typedef struct {
-   int hook_placeholder;
+   int hooks_enabled;
 } _mongocrypt_crypto_t;
 
 uint32_t

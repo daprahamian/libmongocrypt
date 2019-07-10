@@ -31,89 +31,90 @@
  */
 #define DEFAULT_MAX_KMS_BYTE_REQUEST 1024
 
-// static bool
-// _sha256 (void *ctx, const char *input, size_t len, unsigned char *hash_out)
-// {
-//    #define SHA256_LEN 32
-//    mongocrypt_status_t *status;
-//    _mongocrypt_crypto_t *crypto = (_mongocrypt_crypto_t*) ctx;
-//    mongocrypt_binary_t *plaintext, *out;
-//    void *hash_ctx;
+static bool
+_sha256 (void *ctx, const char *input, size_t len, unsigned char *hash_out)
+{
+   #define SHA256_LEN 32
+   mongocrypt_status_t *status;
+   _mongocrypt_crypto_t *crypto = (_mongocrypt_crypto_t*) ctx;
+   mongocrypt_binary_t *plaintext, *out;
 
-//    status = mongocrypt_status_new ();
-//    plaintext = mongocrypt_binary_new_from_data ((uint8_t*)input, len);
-//    out = mongocrypt_binary_new();
+   (void) crypto;
 
-//    out->data = hash_out;
-//    out->len = SHA256_LEN;
+   status = mongocrypt_status_new ();
+   plaintext = mongocrypt_binary_new_from_data ((uint8_t*)input, len);
+   out = mongocrypt_binary_new();
 
-//    // hash_ctx = crypto->hash_sha_256_new (status);
-//    // if (!hash_ctx) {
-//    //    return false;
-//    // }
-//    // if (!crypto->hash_update (hash_ctx, plaintext, status)) {
-//    //    return false;
-//    // }
-//    // if (!crypto->hash_finalize (hash_ctx, out, status)) {
-//    //    return false;
-//    // }
-//    // crypto->hash_destroy (hash_ctx);
+   out->data = hash_out;
+   out->len = SHA256_LEN;
 
-//    mongocrypt_status_destroy (status);
-//    mongocrypt_binary_destroy (plaintext);
-//    mongocrypt_binary_destroy (out);
-//    return true;
-// }
+   // hash_ctx = crypto->hash_sha_256_new (status);
+   // if (!hash_ctx) {
+   //    return false;
+   // }
+   // if (!crypto->hash_update (hash_ctx, plaintext, status)) {
+   //    return false;
+   // }
+   // if (!crypto->hash_finalize (hash_ctx, out, status)) {
+   //    return false;
+   // }
+   // crypto->hash_destroy (hash_ctx);
 
-// static bool
-// _sha256_hmac (void *ctx,
-//               const char *key_input,
-//               size_t key_len,
-//               const char *input,
-//               size_t len,
-//               unsigned char *hash_out)
-// {
-//    #define SHA256_LEN 32
-//    mongocrypt_status_t *status;
-//    _mongocrypt_crypto_t *crypto = (_mongocrypt_crypto_t*) ctx;
-//    mongocrypt_binary_t *key, *plaintext, *out;
+   mongocrypt_status_destroy (status);
+   mongocrypt_binary_destroy (plaintext);
+   mongocrypt_binary_destroy (out);
+   return true;
+}
 
-//    (void) crypto;
+static bool
+_sha256_hmac (void *ctx,
+              const char *key_input,
+              size_t key_len,
+              const char *input,
+              size_t len,
+              unsigned char *hash_out)
+{
+   #define SHA256_LEN 32
+   mongocrypt_status_t *status;
+   _mongocrypt_crypto_t *crypto = (_mongocrypt_crypto_t*) ctx;
+   mongocrypt_binary_t *key, *plaintext, *out;
 
-//    status = mongocrypt_status_new ();
-//    key = mongocrypt_binary_new_from_data ((uint8_t*)key_input, key_len);
-//    plaintext = mongocrypt_binary_new_from_data ((uint8_t*)input, len);
-//    out = mongocrypt_binary_new();
+   (void) crypto;
 
-//    out->data = hash_out;
-//    out->len = SHA256_LEN;
+   status = mongocrypt_status_new ();
+   key = mongocrypt_binary_new_from_data ((uint8_t*)key_input, key_len);
+   plaintext = mongocrypt_binary_new_from_data ((uint8_t*)input, len);
+   out = mongocrypt_binary_new();
 
-//    // hmac_ctx = crypto->hmac_sha_256_new (key, status);
-//    // if (!hmac_ctx) {
-//    //    return false;
-//    // }
-//    // if (!crypto->hmac_update (hmac_ctx, plaintext, status)) {
-//    //    return false;
-//    // }
-//    // if (!crypto->hmac_finalize (hmac_ctx, out, status)) {
-//    //    return false;
-//    // }
-//    // crypto->hmac_destroy (hmac_ctx);
+   out->data = hash_out;
+   out->len = SHA256_LEN;
 
-//    mongocrypt_status_destroy (status);
-//    mongocrypt_binary_destroy (key);
-//    mongocrypt_binary_destroy (plaintext);
-//    mongocrypt_binary_destroy (out);
-//    return true;
-// }
+   // hmac_ctx = crypto->hmac_sha_256_new (key, status);
+   // if (!hmac_ctx) {
+   //    return false;
+   // }
+   // if (!crypto->hmac_update (hmac_ctx, plaintext, status)) {
+   //    return false;
+   // }
+   // if (!crypto->hmac_finalize (hmac_ctx, out, status)) {
+   //    return false;
+   // }
+   // crypto->hmac_destroy (hmac_ctx);
 
-// static void
-// _set_kms_crypto_hooks (_mongocrypt_crypto_t *crypto, kms_request_opt_t *opts)
-// {
-//    if (crypto->hash_sha_256_new) {
-//       kms_request_opt_set_crypto_hooks (opts, _sha256, _sha256_hmac, crypto);
-//    }
-// }
+   mongocrypt_status_destroy (status);
+   mongocrypt_binary_destroy (key);
+   mongocrypt_binary_destroy (plaintext);
+   mongocrypt_binary_destroy (out);
+   return true;
+}
+
+static void
+_set_kms_crypto_hooks (_mongocrypt_crypto_t *crypto, kms_request_opt_t *opts)
+{
+   if (crypto->hooks_enabled) {
+      kms_request_opt_set_crypto_hooks (opts, _sha256, _sha256_hmac, crypto);
+   }
+}
 
 
 bool
@@ -166,7 +167,7 @@ _mongocrypt_kms_ctx_init_aws_decrypt (mongocrypt_kms_ctx_t *kms,
    /* create the KMS request. */
    opt = kms_request_opt_new ();
 
-//   _set_kms_crypto_hooks (crypto, opt);
+   _set_kms_crypto_hooks (crypto, opt);
    /* TODO: we might want to let drivers control whether or not we send
     * Connection: close header. Unsure right now. */
    kms_request_opt_set_connection_close (opt, true);
@@ -260,7 +261,7 @@ _mongocrypt_kms_ctx_init_aws_encrypt (
    /* create the KMS request. */
    opt = kms_request_opt_new ();
 
-//   _set_kms_crypto_hooks (crypto, opt);
+   _set_kms_crypto_hooks (crypto, opt);
    /* TODO: we might want to let drivers control whether or not we send
     * Connection: close header. Unsure right now. */
    kms_request_opt_set_connection_close (opt, true);
