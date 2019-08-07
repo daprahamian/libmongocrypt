@@ -128,10 +128,17 @@ module.exports = function(modules) {
         }
 
         // terminal states
-        case MONGOCRYPT_CTX_READY:
-          callback(null, bson.deserialize(context.finalize()));
+        case MONGOCRYPT_CTX_READY: {
+          const finalizedContext = context.finalize();
+          // TODO: It seems like we should rework the state logic here?
+          if (context.status.code !== 0 && context.status.type !== 0) {
+            const message = context.status.message || 'Finalization error';
+            callback(new MongoCryptError(message));
+            return;
+          }
+          callback(null, bson.deserialize(finalizedContext));
           return;
-
+        }
         case MONGOCRYPT_CTX_ERROR: {
           const message = context.status.message;
           callback(new MongoCryptError(message));

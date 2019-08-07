@@ -238,8 +238,32 @@ void MongoCrypt::logHandler(mongocrypt_log_level_t level,
     Nan::Call(*mongoCrypt->_logger.get(), Nan::GetCurrentContext()->Global(), 2, argv);
 }
 
+
+void MaybeSetCryptoHookErrorStatus(v8::Local<v8::Value> result, mongocrypt_status_t *status) {
+    if (!result->IsObject()) {
+        return;
+    }
+    auto kErrorMessageKey = Nan::New("message").ToLocalChecked();
+    auto hookError = result->ToObject();
+    if (!Nan::Has(hookError, kErrorMessageKey).FromMaybe(false)) {
+        return;
+    }
+    v8::Local<v8::Value> emptyString = Nan::New("").ToLocalChecked();
+    auto errorMessageValue = Nan::Get(hookError, kErrorMessageKey).FromMaybe(emptyString);
+    // auto errmsg = *Nan::Utf8String(errorMessageValue->ToString());
+    std::string errorMessage(*Nan::Utf8String(errorMessageValue->ToString()));
+    mongocrypt_status_set(
+        status,
+        MONGOCRYPT_STATUS_ERROR_CLIENT,
+        1,
+        errorMessage.c_str(),
+        errorMessage.length() + 1
+    );
+}
+
 MongoCrypt::MongoCrypt(mongocrypt_t* mongo_crypt, Nan::Callback* logger, CryptoHooks* hooks)
     : _mongo_crypt(mongo_crypt), _logger(logger), _cryptoHooks(hooks) {}
+
 
 bool MongoCrypt::setupCryptoHooks(mongocrypt_t* mongoCrypt, CryptoHooks* cryptoHooks) {
     auto aes_256_cbc_encrypt =
@@ -260,6 +284,7 @@ bool MongoCrypt::setupCryptoHooks(mongocrypt_t* mongoCrypt, CryptoHooks* cryptoH
 
             if (!result->IsNumber()) {
                 // TODO: error checking, use status
+                MaybeSetCryptoHookErrorStatus(result, status);
                 return false;
             }
 
@@ -285,6 +310,7 @@ bool MongoCrypt::setupCryptoHooks(mongocrypt_t* mongoCrypt, CryptoHooks* cryptoH
 
             if (!result->IsNumber()) {
                 // TODO: error checking, use status
+                MaybeSetCryptoHookErrorStatus(result, status);
                 return false;
             }
 
@@ -316,7 +342,13 @@ bool MongoCrypt::setupCryptoHooks(mongocrypt_t* mongoCrypt, CryptoHooks* cryptoH
 
             // TODO: error checking, use status if passed back value is not undefined
             v8::Local<v8::Value> argv[] = {keyBuffer, inputBuffer, outputBuffer};
-            Nan::Call(*hook, Nan::GetCurrentContext()->Global(), 3, argv);
+            v8::Local<v8::Value> defaultValue = Nan::False();
+            v8::Local<v8::Value> result = Nan::Call(*hook, Nan::GetCurrentContext()->Global(), 3, argv).FromMaybe(defaultValue);
+            if (!result->IsNumber()) {
+                // TODO: error checking, use status
+                MaybeSetCryptoHookErrorStatus(result, status);
+                return false;
+            }
             return true;
         };
 
@@ -332,7 +364,13 @@ bool MongoCrypt::setupCryptoHooks(mongocrypt_t* mongoCrypt, CryptoHooks* cryptoH
 
             // TODO: error checking, use status if passed back value is not undefined
             v8::Local<v8::Value> argv[] = {keyBuffer, inputBuffer, outputBuffer};
-            Nan::Call(*hook, Nan::GetCurrentContext()->Global(), 3, argv);
+            v8::Local<v8::Value> defaultValue = Nan::False();
+            v8::Local<v8::Value> result = Nan::Call(*hook, Nan::GetCurrentContext()->Global(), 3, argv).FromMaybe(defaultValue);
+            if (!result->IsNumber()) {
+                // TODO: error checking, use status
+                MaybeSetCryptoHookErrorStatus(result, status);
+                return false;
+            }
             return true;
         };
 
@@ -347,7 +385,14 @@ bool MongoCrypt::setupCryptoHooks(mongocrypt_t* mongoCrypt, CryptoHooks* cryptoH
             v8::Local<v8::Value> argv[] = {inputBuffer, outputBuffer};
 
             // TODO: error checking, use status if passed back value is not undefined
-            Nan::Call(*hook, Nan::GetCurrentContext()->Global(), 2, argv);
+            v8::Local<v8::Value> defaultValue = Nan::False();
+            v8::Local<v8::Value> result = Nan::Call(*hook, Nan::GetCurrentContext()->Global(), 2, argv).FromMaybe(defaultValue);
+
+            if (!result->IsNumber()) {
+                // TODO: error checking, use status
+                MaybeSetCryptoHookErrorStatus(result, status);
+                return false;
+            }
             return true;
         };
 
